@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+
+import subprocess
+import requests
+import json
+import argparse
+
+parameters = {"server_name": "panchoop",
+              "trigger": "ready",
+              "command": ["zenity", "--warning", 
+                          "--text='<span font=\"300\" foreground=\"red\">READY</span>'",
+                          "--title=\"Ready\"", "--timeout=1"],
+              "silent": True}
+
+def use_argparse():
+    description = "Uses nfty to execute a command while communicating online."
+    parser = argparse.ArgumentParser(prog="nfty_hook",
+                                     description=description)
+    # Optional argument
+    halp = "To set a different command to be run. Input with \" \" to include more arguments"
+    parser.add_argument('-c', '--command', help=halp)
+    halp = "To set a different server from the default: " 
+    halp += parameters["server_name"]
+    parser.add_argument('-s', '--server_name', action='store', help=halp)
+    halp = "To set a different trigger phrase from the default: "
+    halp += parameters["trigger"]
+    parser.add_argument('-t', '--trigger', action='store', help=halp) 
+    halp = "Verbose. Print to console if a trigger was received."
+    parser.add_argument('-v', '--verbose', action='store_true', help=halp)
+
+    ##
+    args = parser.parse_args()
+    ## reset
+    if args.command:
+        parameters["command"] = args.command.split(" ")
+    if args.server_name:
+        parameters["server_name"] = args.server_name
+    if args.trigger:
+        parameters["trigger"] = args.trigger
+    if args.verbose:
+        parameters["silent"] = False
+
+use_argparse()
+instructions = "To trigger the command, execute the following curl command: "
+instructions += f"\n> curl -d \"{parameters['trigger']}\" "
+instructions += f"ntfy.sh/{parameters['server_name']}"
+print(instructions)
+
+resp = requests.get(f"https://ntfy.sh/{parameters['server_name']}/json",
+                    stream=True)
+for line in resp.iter_lines():
+    if line:
+        answer = json.loads(line.decode('utf-8'))
+        if (answer['event'] == "message"):
+            if answer["message"] == parameters['trigger']:
+                if (not parameters['silent']):
+                    print("Received trigger phrase!")
+                subprocess.run(parameters['command'])
